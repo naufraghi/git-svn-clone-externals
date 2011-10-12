@@ -16,6 +16,13 @@ logging.basicConfig(format='%(asctime)s %(levelname)s[%(name)s]: %(message)s',
                             datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger("git-svn-clone-externals")
 
+class col:
+    PINK = '\033[95m'
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    ENDC = '\033[0m'
 
 @contextmanager
 def cd(path):
@@ -27,8 +34,22 @@ def cd(path):
 def logged_call(func, log=logger.debug):
     @wraps(func)
     def _logged(args, **kwargs):
-        log("{0}$ {1}".format(os.getcwd(), " ".join(args)))
-        return func(args, **kwargs)
+        color = col.BLUE
+        if log is logger.info:
+            color = col.GREEN
+        elif log is logger.warning:
+            color = col.YELLOW
+        elif log is logger.error:
+            color = col.RED
+        end_color = col.ENDC
+        cwd = os.getcwd()
+        command = " ".join(args)
+        log("{cwd}$ {color}{command}{end_color}".format(**locals()))
+        res = func(args, **kwargs)
+        if res and func is subprocess.call:
+            color = col.RED
+            logger.error("{cwd}$ {color}{command}{end_color}".format(**locals()))
+        return res
     return _logged
 
 def svn_info():
@@ -114,6 +135,8 @@ def run():
             commands += other_args
             commands += [uri, path]
             logged_call(subprocess.call, logger.info)(commands)
+            if not [x for x in os.listdir(path) if x != ".git"]:
+                logger.warning("{0}Foder {path} is empty after clone!{1}".format(col.YELLOW, col.ENDC, **locals()))
 
 if __name__ == "__main__":
     run()
