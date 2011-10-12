@@ -8,6 +8,7 @@ import argparse
 import logging
 import subprocess
 from contextlib import contextmanager
+from functools import wraps
 
 os.environ["LANG"] = "C"
 
@@ -23,8 +24,15 @@ def cd(path):
     yield
     os.chdir(cur_dir)
 
+def logged_call(func, log=logger.debug):
+    @wraps(func)
+    def _logged(args, **kwargs):
+        log("{0}$ {1}".format(os.getcwd(), " ".join(args)))
+        return func(args, **kwargs)
+    return _logged
+
 def svn_info():
-    info = subprocess.check_output(["svn", "info"])
+    info = logged_call(subprocess.check_output)(["svn", "info"])
     info_dict = {}
     for line in info.split("\n"):
         if ":" in line:
@@ -33,7 +41,7 @@ def svn_info():
     return info_dict
 
 def svn_externals():
-    externals = subprocess.check_output(["svn", "st"])
+    externals = logged_call(subprocess.check_output)(["svn", "st"])
     seen = set()
     for line in externals.split("\n"):
         if line.strip() and line.startswith("X"):
@@ -43,7 +51,7 @@ def svn_externals():
                 seen.add(root)
             else:
                 continue
-            props = subprocess.check_output(["svn", "propget", "svn:externals", root])
+            props = logged_call(subprocess.check_output)(["svn", "propget", "svn:externals", root])
             for prop in props.split("\n"):
                 if prop.strip():
                     yield root, prop.strip()
@@ -72,7 +80,7 @@ def normalize_externals(repo_root, externals):
 
 def check_svn(path):
     try:
-        out = subprocess.check_output(["svn", "info", path])
+        out = logged_call(subprocess.check_output)(["svn", "info", path])
     except subprocess.CalledProcessError:
         raise argparse.ArgumentError("Invalid svn working copy!\nsvn info {0} returned:\n\n{1}".format(path, out))
     return path
@@ -99,13 +107,13 @@ def run():
     commands = ["git", "svn", "clone"]
     commands += other_args
     commands += [repo_url, args.destination]
-    subprocess.call(commands)
+    logged_call(subprocess.call, logger.info)(commands)
     with cd(args.destination):
         for rev, uri, path in externals:
             commands = ["git", "svn", "clone"]
             commands += other_args
             commands += [uri, path]
-            subprocess.call(commands)
+            logged_call(subprocess.call, logger.info)(commands)
 
 if __name__ == "__main__":
     run()
