@@ -1,0 +1,6 @@
+Clone an svn repo with externals
+-------------------------------------------------------------------------------
+
+Usage:
+
+git-svn-clone-externals.py svn-working-copy dest-dir

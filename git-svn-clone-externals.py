@@ -1,0 +1,111 @@
+#!/usr/bin/env python
+#-*- coding: utf-8 -*-
+# Copyright 2011 by Matteo Bertini <matteo@naufraghi.net>
+
+import os
+import sys
+import argparse
+import logging
+import subprocess
+from contextlib import contextmanager
+
+os.environ["LANG"] = "C"
+
+logging.basicConfig(format='%(asctime)s %(levelname)s[%(name)s]: %(message)s',
+                            datefmt='%Y-%m-%d %H:%M:%S')
+logger = logging.getLogger("git-svn-clone-externals")
+
+
+@contextmanager
+def cd(path):
+    cur_dir = os.getcwd()
+    os.chdir(path)
+    yield
+    os.chdir(cur_dir)
+
+def svn_info():
+    info = subprocess.check_output(["svn", "info"])
+    info_dict = {}
+    for line in info.split("\n"):
+        if ":" in line:
+            key, value = line.split(":", 1)
+            info_dict[key.strip()] = value.strip()
+    return info_dict
+
+def svn_externals():
+    externals = subprocess.check_output(["svn", "st"])
+    seen = set()
+    for line in externals.split("\n"):
+        if line.strip() and line.startswith("X"):
+            path = line.split()[1].strip()
+            root = os.path.dirname(path)
+            if root not in seen:
+                seen.add(root)
+            else:
+                continue
+            props = subprocess.check_output(["svn", "propget", "svn:externals", root])
+            for prop in props.split("\n"):
+                if prop.strip():
+                    yield root, prop.strip()
+
+def extpath_join(root, uri):
+    if uri.startswith("^"):
+        return root + uri[1:]
+    else:
+        raise NotImplementedError
+
+def normalize_externals(repo_root, externals):
+    # Old syntax: third-party/sounds   http://svn.example.com/repos/sounds [UNSUPPORTED]
+    # New syntax: -r148 ^/skinproj third-party/skins
+    # peg syntax: ^/skinproj@148 third-party/skins
+    for root, external in externals:
+        parts = external.split()
+        if len(parts) == 2:
+            rev = None
+            uri, path = parts
+            if "@" in uri:
+                uri, rev = uri.split("@")
+        elif len(parts) == 3:
+            rev, uri, path = parts()
+            rev = rev.strip("-r")
+        yield rev, extpath_join(repo_root, uri), os.path.normpath(os.path.join(root, path))
+
+def check_svn(path):
+    try:
+        out = subprocess.check_output(["svn", "info", path])
+    except subprocess.CalledProcessError:
+        raise argparse.ArgumentError("Invalid svn working copy!\nsvn info {0} returned:\n\n{1}".format(path, out))
+    return path
+
+def run():
+    parser = argparse.ArgumentParser(description="git svn clone and follow svn:externals")
+    parser.add_argument("working_copy", help="Point to an existing svn checkout", type=check_svn)
+    parser.add_argument("destination", help="Destination folder")
+
+    parser.add_argument("-v", "--verbosity", action='count', default=0)
+    parser.add_argument("-q", "--quiet", action='count', default=0)
+
+    args, other_args = parser.parse_known_args()
+    logger.setLevel(max(1, logging.INFO-10*(args.verbosity - args.quiet)))
+
+    externals = []
+    with cd(args.working_copy):
+        repo_info = svn_info()
+        repo_root = repo_info["Repository Root"]
+        for rev, uri, path in normalize_externals(repo_root, svn_externals()):
+            externals += [(rev, uri, path)]
+
+    repo_url = repo_info["URL"]
+    commands = ["git", "svn", "clone"]
+    commands += other_args
+    commands += [repo_url, args.destination]
+    subprocess.call(commands)
+    with cd(args.destination):
+        for rev, uri, path in externals:
+            commands = ["git", "svn", "clone"]
+            commands += other_args
+            commands += [uri, path]
+            subprocess.call(commands)
+
+if __name__ == "__main__":
+    run()
