@@ -6,7 +6,7 @@ Usage:
 git-svn-clone-externals.py svn-working-copy dest-dir
 
 The main difference between this and other alternative scripts is that this
-starts from an svn checkout to discover the externals.
+one starts from an svn checkout to discover the externals.
 
 TODO:
 * git-ignore externals
