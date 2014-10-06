@@ -18,6 +18,6 @@ Depends
 TODO
 ----
 
-[ ] git-ignore externals
-[ ] test on convoluted externals (relative paths)
-[ ] manage fixed revision externals
+* git-ignore externals
+* test on convoluted externals (relative paths)
+* manage fixed revision externals
