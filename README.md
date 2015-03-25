@@ -1,6 +1,8 @@
 Clone an svn repo with externals
 ================================
 
+[![Join the chat at https://gitter.im/naufraghi/git-svn-clone-externals](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/naufraghi/git-svn-clone-externals?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Usage
 -----
 
