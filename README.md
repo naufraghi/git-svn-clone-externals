@@ -6,7 +6,7 @@ Clone an svn repo with externals
 Usage
 -----
 
-`git-svn-clone-externals.py svn-working-copy dest-dir`
+`git-svn-clone-externals svn-working-copy dest-dir`
 
 The main difference between this and other alternative scripts is that this
 one starts from an svn checkout to discover the externals.

@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-# Copyright 2011 by Matteo Bertini <matteo@naufraghi.net>
+#
+# Copyright (C) 2011-2015 Matteo Bertini <matteo@naufraghi.net>
+# Latest version: https://github.com/naufraghi/git-svn-clone-externals
+
+from __future__ import absolute_import, division, print_function
 
 import os
 import sys
@@ -10,10 +14,9 @@ import subprocess
 from contextlib import contextmanager
 from functools import wraps
 
-os.environ["LANG"] = "C"
 
 logging.basicConfig(format='%(asctime)s %(levelname)s[%(name)s]: %(message)s',
-                            datefmt='%Y-%m-%d %H:%M:%S')
+                    datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger("git-svn-clone-externals")
 
 class col:
@@ -30,6 +33,14 @@ def cd(path):
     os.chdir(path)
     yield
     os.chdir(cur_dir)
+
+@contextmanager
+def lang(l):
+    old_lang = os.environ["LANG"]
+    os.environ["LANG"] = l
+    yield
+    os.environ["LANG"] = old_lang
+
 
 def logged_call(func, log=logger.debug):
     @wraps(func)
@@ -53,7 +64,7 @@ def logged_call(func, log=logger.debug):
     return _logged
 
 def svn_info():
-    info = logged_call(subprocess.check_output)(["svn", "info"])
+    info = logged_call(subprocess.check_output)(["svn", "info"]).decode("utf8")
     info_dict = {}
     for line in info.split("\n"):
         if ":" in line:
@@ -62,7 +73,7 @@ def svn_info():
     return info_dict
 
 def svn_externals():
-    externals = logged_call(subprocess.check_output)(["svn", "st"])
+    externals = logged_call(subprocess.check_output)(["svn", "st"]).decode("utf8")
     seen = set()
     for line in externals.split("\n"):
         if line.strip() and line.startswith("X"):
@@ -72,7 +83,7 @@ def svn_externals():
                 seen.add(root)
             else:
                 continue
-            props = logged_call(subprocess.check_output)(["svn", "propget", "svn:externals", root])
+            props = logged_call(subprocess.check_output)(["svn", "propget", "svn:externals", root]).decode("utf8")
             for prop in props.split("\n"):
                 if prop.strip():
                     yield root, prop.strip()
@@ -101,42 +112,45 @@ def normalize_externals(repo_root, externals):
 
 def check_svn(path):
     try:
-        out = logged_call(subprocess.check_output)(["svn", "info", path])
+        out = logged_call(subprocess.check_output)(["svn", "info", path]).decode("utf8")
     except subprocess.CalledProcessError:
         raise argparse.ArgumentError("Invalid svn working copy!\nsvn info {0} returned:\n\n{1}".format(path, out))
     return path
 
 def run():
-    parser = argparse.ArgumentParser(description="git svn clone and follow svn:externals")
+    parser = argparse.ArgumentParser(description="git svn clone and follow svn:externals, \
+                                                  all unknown arguments are forwarded \
+                                                  (use -r HEAD for a shallow clone)")
     parser.add_argument("working_copy", help="Point to an existing svn checkout", type=check_svn)
     parser.add_argument("destination", help="Destination folder")
-
-    parser.add_argument("-v", "--verbosity", action='count', default=0)
-    parser.add_argument("-q", "--quiet", action='count', default=0)
+    parser.add_argument("-v", "--verbose", action='store_true')
 
     args, other_args = parser.parse_known_args()
-    logger.setLevel(max(1, logging.INFO-10*(args.verbosity - args.quiet)))
+    logger.setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
-    externals = []
-    with cd(args.working_copy):
-        repo_info = svn_info()
-        repo_root = repo_info["Repository Root"]
-        for rev, uri, path in normalize_externals(repo_root, svn_externals()):
-            externals += [(rev, uri, path)]
+    # normalize svn output
+    with lang("C"):
+        externals = []
+        with cd(args.working_copy):
+            repo_info = svn_info()
+            repo_root = repo_info["Repository Root"]
+            for rev, uri, path in normalize_externals(repo_root, svn_externals()):
+                externals += [(rev, uri, path)]
 
-    repo_url = repo_info["URL"]
-    commands = ["git", "svn", "clone"]
-    commands += other_args
-    commands += [repo_url, args.destination]
-    logged_call(subprocess.call, logger.info)(commands)
-    with cd(args.destination):
-        for rev, uri, path in externals:
-            commands = ["git", "svn", "clone"]
-            commands += other_args
-            commands += [uri, path]
-            logged_call(subprocess.call, logger.info)(commands)
-            if not [x for x in os.listdir(path) if x != ".git"]:
-                logger.warning("{0}Foder {path} is empty after clone!{1}".format(col.YELLOW, col.ENDC, **locals()))
+        repo_url = repo_info["URL"]
+        commands = ["git", "svn", "clone"]
+        commands += other_args
+        commands += [repo_url, args.destination]
+        logged_call(subprocess.call, logger.info)(commands)
+        with cd(args.destination):
+            for rev, uri, path in externals:
+                commands = ["git", "svn", "clone"]
+                commands += other_args
+                commands += [uri, path]
+                logged_call(subprocess.call, logger.info)(commands)
+                if not [x for x in os.listdir(path) if x != ".git"]:
+                    logger.warning("{0}Foder {path} is empty after clone!{1}".format(col.YELLOW, col.ENDC, **locals()))
+
 
 if __name__ == "__main__":
     run()
