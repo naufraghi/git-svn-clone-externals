@@ -9,7 +9,7 @@ with open(path.join(here, 'DESCRIPTION.rst'), encoding='utf-8') as f:
 
 setup(
     name='git-svn-clone-externals',
-    version='1.0.2',
+    version='1.0.3',
     description='Clone an svn checkout in a tree of nested git-svn repos',
     long_description=long_description,
     url='https://github.com/naufraghi/git-svn-clone-externals',
@@ -31,6 +31,7 @@ setup(
     keywords='svn git git-svn externals',
     packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
     install_requires=[],
+    py_modules=["git_svn_clone_externals"],
     entry_points={
         'console_scripts': [
             'git-svn-clone-externals=git_svn_clone_externals:run',
