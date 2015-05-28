@@ -21,7 +21,7 @@ The scritps depends on `git svn`, in Ubuntu you can get the package with:
 
 `$ sudo apt-get install git-svn`
 
-and than instal the script with:
+and than install the script with:
 
 `$ pip install git-svn-clone-externals`
 
