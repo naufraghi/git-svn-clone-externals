@@ -14,6 +14,13 @@ Usage
 The main difference between this and other alternative scripts is that this
 one starts from an svn checkout to discover the externals.
 
+The package comes with some utility command to manage a nested `git-svn` clone:
+
+- `git-svn-dcommit` and `git-svn-rebase`: as `git svn <command>` but with automatic `stash save` and `stash pop`
+- `git-svn-outgoing`: shows a diff of dcommit'able commits
+
+All scripts are offering a `--recursive` option.
+
 Installation
 ------------
 

@@ -27,6 +27,8 @@ class col:
     RED = '\033[91m'
     ENDC = '\033[0m'
 
+# subprocess helpers
+
 @contextmanager
 def cd(path):
     cur_dir = os.getcwd()
@@ -40,7 +42,6 @@ def lang(l):
     os.environ["LANG"] = l
     yield
     os.environ["LANG"] = old_lang
-
 
 def logged_call(func, log=logger.debug):
     @wraps(func)
@@ -63,8 +64,57 @@ def logged_call(func, log=logger.debug):
         return res
     return _logged
 
+sh = subprocess.check_output
+lsh = logged_call(sh)
+
+# Git svn helpers
+
+@contextmanager
+def git_stasher(path="."):
+    with cd(path):
+        git_status_lines = sh(["git", "status", "--por"]).decode("utf8").strip().split()
+        need_stash = any(l.startswith("M") for l in git_status_lines)
+        if need_stash:
+            lsh(["git", "stash"])
+        yield
+        if need_stash:
+            lsh(["git", "stash", "pop"])
+
+def git_svn_dcommit(path="."):
+    with git_stasher(path):
+        return subprocess.check_call(["git", "svn", "dcommit"])
+
+def git_svn_rebase(path="."):
+    with git_stasher(path):
+        return subprocess.check_call(["git", "svn", "rebase"])
+
+def git_svn_outgoing(path="."):
+    with cd(path):
+        dcommit_n_lines = sh(["git", "svn", "dcommit", "-n"]).decode("utf8").strip().split()
+        diff_tree_lines = (l for l in dcommit_n_lines if l.startswith("diff-tree"))
+        # diff-tree ff144a013554a3d9547e00ac37c1c349c932d874~1 ff144a013554a3d9547e00ac37c1c349c932d874
+        for commit in (l.split()[-1] for l in diff_tree_lines):
+            subprocess.check_call(["git", "show", commit])
+
+def git_recursive(git_svn_command):
+    def _recursive_git_svn_command(path="."):
+        path = os.path.abspath(path)
+        logger.info("Working in %s", path)
+        def iter_git_folders(path):
+            with ch(path):
+                if os.path.exists(".git"):
+                    yield os.path.abspath(path)
+                for subpath in os.listdir(path):
+                    for gitfolder in iter_git_folders(subpath):
+                        yield gitfolder
+        for gitpath in iter_git_folders(path):
+            git_svn_command(gitpath)
+    return _recursive_git_svn_command
+
+# svn helpers
+
 def svn_info():
-    info = logged_call(subprocess.check_output)(["svn", "info"]).decode("utf8")
+    info = lsh(["svn", "info"]).decode("utf8")
     info_dict = {}
     for line in info.split("\n"):
         if ":" in line:
@@ -73,7 +123,7 @@ def svn_info():
     return info_dict
 
 def svn_externals():
-    externals = logged_call(subprocess.check_output)(["svn", "st"]).decode("utf8")
+    externals = lsh(["svn", "st"]).decode("utf8")
     seen = set()
     for line in externals.split("\n"):
         if line.strip() and line.startswith("X"):
@@ -83,7 +133,7 @@ def svn_externals():
                 seen.add(root)
             else:
                 continue
-            props = logged_call(subprocess.check_output)(["svn", "propget", "svn:externals", root]).decode("utf8")
+            props = lsh(["svn", "propget", "svn:externals", root]).decode("utf8")
             for prop in props.split("\n"):
                 if prop.strip():
                     yield root, prop.strip()
@@ -110,12 +160,43 @@ def normalize_externals(repo_root, externals):
             rev = rev.strip("-r")
         yield rev, extpath_join(repo_root, uri), os.path.normpath(os.path.join(root, path))
 
+# Command line helpers
+
 def check_svn(path):
     try:
-        out = logged_call(subprocess.check_output)(["svn", "info", path]).decode("utf8")
+        out = lsh(["svn", "info", path]).decode("utf8")
     except subprocess.CalledProcessError:
         raise argparse.ArgumentError("Invalid svn working copy!\nsvn info {0} returned:\n\n{1}".format(path, out))
     return path
+
+def check_dir(path):
+    if os.path.isdir(path):
+        return path
+    else:
+        raise argparse.ArgumentError("Invalid path {0:r}".format(path))
+
+def git_svn_command(command_name):
+    command = eval("git_svn_%s" % command_name)
+    def run_git_svn_command():
+        parser = argparse.ArgumentParser(description="Auto stashing git svn {0}".format(command_name))
+        parser.add_argument("path", help="Point to an existing path", type=check_dir, default=".")
+        parser.add_argument("-r", "--recursive", help="Recur in all git subfolders")
+        parser.add_argument("-v", "--verbose", action='store_true')
+
+        args, other_args = parser.parse_known_args()
+        logger.setLevel(logging.DEBUG if args.verbose else logging.INFO)
+
+        # normalize outputs
+        with lang("C"):
+            if not args.recursive:
+                command(args.path)
+            else:
+                git_recursive(command)(args.path)
+    return run_git_svn_command
+
+run_dcommit = git_svn_command("dcommit")
+run_rebase = git_svn_command("rebase")
+run_outgoing = git_svn_command("outgoing")
 
 def run():
     parser = argparse.ArgumentParser(description="git svn clone and follow svn:externals, \
