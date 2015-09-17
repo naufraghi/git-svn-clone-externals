@@ -90,7 +90,7 @@ def git_svn_rebase(path="."):
 
 def git_svn_outgoing(path="."):
     with cd(path):
-        dcommit_n_lines = sh(["git", "svn", "dcommit", "-n"]).decode("utf8").strip().split()
+        dcommit_n_lines = lsh(["git", "svn", "dcommit", "-n"]).decode("utf8").strip().split()
         diff_tree_lines = (l for l in dcommit_n_lines if l.startswith("diff-tree"))
         # diff-tree ff144a013554a3d9547e00ac37c1c349c932d874~1 ff144a013554a3d9547e00ac37c1c349c932d874
         for commit in (l.split()[-1] for l in diff_tree_lines):
@@ -98,13 +98,17 @@ def git_svn_outgoing(path="."):
 
 def git_recursive(git_svn_command):
     def _recursive_git_svn_command(path="."):
-        path = os.path.abspath(path)
-        logger.info("Working in %s", path)
+        logger.info("Working in %s", os.path.abspath(path))
+        def is_valid_dir(path):
+            return os.path.isdir(path)
+        def abs_listdir(path):
+            for name in os.listdir(path):
+                yield os.path.abspath(name)
         def iter_git_folders(path):
-            with ch(path):
+            with cd(path):
                 if os.path.exists(".git"):
                     yield os.path.abspath(path)
-                for subpath in os.listdir(path):
+                for subpath in (s for s in abs_listdir(path) if is_valid_dir(s)):
                     for gitfolder in iter_git_folders(subpath):
                         yield gitfolder
         for gitpath in iter_git_folders(path):
@@ -180,7 +184,7 @@ def git_svn_command(command_name):
     def run_git_svn_command():
         parser = argparse.ArgumentParser(description="Auto stashing git svn {0}".format(command_name))
         parser.add_argument("path", help="Point to an existing path", type=check_dir, default=".")
-        parser.add_argument("-r", "--recursive", help="Recur in all git subfolders")
+        parser.add_argument("-r", "--recursive", help="Recur in all git subfolders", action="store_true")
         parser.add_argument("-v", "--verbose", action='store_true')
 
         args, other_args = parser.parse_known_args()
