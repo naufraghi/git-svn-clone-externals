@@ -89,7 +89,7 @@ def git_svn_rebase(path="."):
         return subprocess.check_call(["git", "svn", "rebase"])
 
 def git_svn_outgoing(path="."):
-    with cd(path):
+    with git_stasher(path):
         dcommit_n_lines = lsh(["git", "svn", "dcommit", "-n"]).decode("utf8").strip().split()
         diff_tree_lines = (l for l in dcommit_n_lines if l.startswith("diff-tree"))
         # diff-tree ff144a013554a3d9547e00ac37c1c349c932d874~1 ff144a013554a3d9547e00ac37c1c349c932d874
