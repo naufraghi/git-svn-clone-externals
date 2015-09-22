@@ -38,10 +38,13 @@ def cd(path):
 
 @contextmanager
 def lang(l):
-    old_lang = os.environ["LANG"]
+    old_lang = os.environ.get("LANG", None)
     os.environ["LANG"] = l
     yield
-    os.environ["LANG"] = old_lang
+    if old_lang is None:
+        del os.environ["LANG"]
+    else:
+        os.environ["LANG"] = old_lang
 
 def logged_call(func, log=logger.debug):
     @wraps(func)
