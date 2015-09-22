@@ -2,3 +2,4 @@ DESCRIPTION.rst
 build/
 dist/
 git_svn_clone_externals.egg-info/
+README.rst
