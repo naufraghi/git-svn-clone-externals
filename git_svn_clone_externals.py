@@ -183,7 +183,7 @@ def check_dir(path):
 def git_svn_command(command_name):
     command = eval("git_svn_%s" % command_name)
     def run_git_svn_command():
-        parser = argparse.ArgumentParser(description="Auto stashing git svn {0}".format(command_name))
+        parser = GitSvnArgumentParser(description="Auto stashing git svn {0}".format(command_name))
         parser.add_argument("path", help="Point to an existing path", type=check_dir, default=".")
         parser.add_argument("-r", "--recursive", help="Recur in all git subfolders", action="store_true")
         parser.add_argument("-v", "--verbose", action='store_true')
@@ -203,10 +203,19 @@ run_dcommit = git_svn_command("dcommit")
 run_rebase = git_svn_command("rebase")
 run_outgoing = git_svn_command("outgoing")
 
+class GitSvnArgumentParser(argparse.ArgumentParser):
+    def __init__(self, *args, **kwargs):
+        super(GitSvnArgumentParser, self).__init__(*args, **kwargs)
+        for tool in ("svn", "git"):
+            try:
+                check_output([tool, "--version"])
+            except:
+                raise self.error("Unable to find `{tool}` command line tools".format(tool=tool))
+
 def run():
-    parser = argparse.ArgumentParser(description="git svn clone and follow svn:externals, \
-                                                  all unknown arguments are forwarded \
-                                                  (use -r HEAD for a shallow clone)")
+    parser = GitSvnArgumentParser(description="git svn clone and follow svn:externals, \
+                                               all unknown arguments are forwarded \
+                                               (use -r HEAD for a shallow clone)")
     parser.add_argument("working_copy", help="Point to an existing svn checkout", type=check_svn)
     parser.add_argument("destination", help="Destination folder")
     parser.add_argument("-v", "--verbose", action='store_true')
