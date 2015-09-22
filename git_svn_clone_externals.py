@@ -64,37 +64,38 @@ def logged_call(func, log=logger.debug):
         return res
     return _logged
 
-sh = subprocess.check_output
-lsh = logged_call(sh)
+call = logged_call(subprocess.call, logger.info)
+check_output = logged_call(subprocess.check_output)
+check_call = logged_call(subprocess.check_call)
 
 # Git svn helpers
 
 @contextmanager
 def git_stasher(path="."):
     with cd(path):
-        git_status_lines = sh(["git", "status", "--por"]).decode("utf8").strip().split()
+        git_status_lines = check_output(["git", "status", "--por"]).decode("utf8").strip().split()
         need_stash = any(l.startswith("M") for l in git_status_lines)
         if need_stash:
-            lsh(["git", "stash"])
+            check_output(["git", "stash"])
         yield
         if need_stash:
-            lsh(["git", "stash", "pop"])
+            check_output(["git", "stash", "pop"])
 
 def git_svn_dcommit(path="."):
     with git_stasher(path):
-        return subprocess.check_call(["git", "svn", "dcommit"])
+        return check_call(["git", "svn", "dcommit"])
 
 def git_svn_rebase(path="."):
     with git_stasher(path):
-        return subprocess.check_call(["git", "svn", "rebase"])
+        return check_call(["git", "svn", "rebase"])
 
 def git_svn_outgoing(path="."):
     with git_stasher(path):
-        dcommit_n_lines = lsh(["git", "svn", "dcommit", "-n"]).decode("utf8").strip().split()
+        dcommit_n_lines = check_output(["git", "svn", "dcommit", "-n"]).decode("utf8").strip().split("\n")
         diff_tree_lines = (l for l in dcommit_n_lines if l.startswith("diff-tree"))
         # diff-tree ff144a013554a3d9547e00ac37c1c349c932d874~1 ff144a013554a3d9547e00ac37c1c349c932d874
         for commit in (l.split()[-1] for l in diff_tree_lines):
-            subprocess.check_call(["git", "show", commit])
+            check_call(["git", "show", commit])
 
 def git_recursive(git_svn_command):
     def _recursive_git_svn_command(path="."):
@@ -118,7 +119,7 @@ def git_recursive(git_svn_command):
 # svn helpers
 
 def svn_info():
-    info = lsh(["svn", "info"]).decode("utf8")
+    info = check_output(["svn", "info"]).decode("utf8")
     info_dict = {}
     for line in info.split("\n"):
         if ":" in line:
@@ -127,7 +128,7 @@ def svn_info():
     return info_dict
 
 def svn_externals():
-    externals = lsh(["svn", "st"]).decode("utf8")
+    externals = check_output(["svn", "st"]).decode("utf8")
     seen = set()
     for line in externals.split("\n"):
         if line.strip() and line.startswith("X"):
@@ -137,7 +138,7 @@ def svn_externals():
                 seen.add(root)
             else:
                 continue
-            props = lsh(["svn", "propget", "svn:externals", root]).decode("utf8")
+            props = check_output(["svn", "propget", "svn:externals", root]).decode("utf8")
             for prop in props.split("\n"):
                 if prop.strip():
                     yield root, prop.strip()
@@ -168,7 +169,7 @@ def normalize_externals(repo_root, externals):
 
 def check_svn(path):
     try:
-        out = lsh(["svn", "info", path]).decode("utf8")
+        out = check_output(["svn", "info", path]).decode("utf8")
     except subprocess.CalledProcessError:
         raise argparse.ArgumentError("Invalid svn working copy!\nsvn info {0} returned:\n\n{1}".format(path, out))
     return path
@@ -226,13 +227,13 @@ def run():
         commands = ["git", "svn", "clone"]
         commands += other_args
         commands += [repo_url, args.destination]
-        logged_call(subprocess.call, logger.info)(commands)
+        call(commands)
         with cd(args.destination):
             for rev, uri, path in externals:
                 commands = ["git", "svn", "clone"]
                 commands += other_args
                 commands += [uri, path]
-                logged_call(subprocess.call, logger.info)(commands)
+                call(commands)
                 if not [x for x in os.listdir(path) if x != ".git"]:
                     logger.warning("{0}Foder {path} is empty after clone!{1}".format(col.YELLOW, col.ENDC, **locals()))
 
