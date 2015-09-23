@@ -12,7 +12,7 @@ Usage
 `git-svn-clone-externals svn-working-copy dest-dir`
 
 The main difference between this and other alternative scripts is that this
-one starts from an svn checkout to discover the externals.
+one starts from an svn checkout to discover the externals, so it's faster.
 
 The package comes with some utility command to manage a nested `git-svn` clone:
 
