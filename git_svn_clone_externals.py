@@ -103,23 +103,21 @@ def git_svn_outgoing(path="."):
         for commit in (l.split()[-1] for l in diff_tree_lines):
             check_call(["git", "show", commit])
 
-def git_recursive(git_svn_command):
+def git_recursive(git_command):
     def _recursive_git_svn_command(path="."):
         logger.info("Working in %s", os.path.abspath(path))
-        def is_valid_dir(path):
-            return os.path.isdir(path)
-        def abs_listdir(path):
-            for name in os.listdir(path):
-                yield os.path.abspath(name)
-        def iter_git_folders(path):
-            with cd(path):
-                if os.path.exists(".git"):
-                    yield os.path.abspath(path)
-                for subpath in (s for s in abs_listdir(path) if is_valid_dir(s)):
-                    for gitfolder in iter_git_folders(subpath):
-                        yield gitfolder
-        for gitpath in iter_git_folders(path):
-            git_svn_command(gitpath)
+        def iter_git_subfolders(path):
+            yield path
+            for dirpath, _, _ in os.walk(path):
+                if os.path.exists(os.path.join(dirpath, '.git')):
+                    yield dirpath
+        seen = set()
+        for rpath in iter_git_subfolders(path):
+            if rpath in seen:
+                continue
+            else:
+                seed.add(rpath)
+            git_command(rpath)
     return _recursive_git_svn_command
 
 # svn helpers
