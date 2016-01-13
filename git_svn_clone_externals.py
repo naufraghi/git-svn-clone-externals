@@ -85,8 +85,8 @@ def git_stasher(path="."):
             check_output(["git", "stash", "pop"])
 
 def git_svn_dcommit(path="."):
-    logger.info("git svn dcommit %s", path)
     git_svn_rebase(path)
+    logger.info("git svn dcommit %s", path)
     with git_stasher(path):
         return check_call(["git", "svn", "dcommit"])
 
