@@ -116,7 +116,7 @@ def git_recursive(git_command):
             if rpath in seen:
                 continue
             else:
-                seed.add(rpath)
+                seen.add(rpath)
             git_command(rpath)
     return _recursive_git_svn_command
 
