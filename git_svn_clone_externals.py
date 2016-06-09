@@ -137,15 +137,18 @@ def svn_externals():
     for line in externals.split("\n"):
         if line.strip() and line.startswith("X"):
             path = line.split()[1].strip()
-            root = os.path.dirname(path)
-            if root not in seen:
-                seen.add(root)
-            else:
-                continue
-            props = check_output(["svn", "propget", "svn:externals", root]).decode("utf8")
-            for prop in props.split("\n"):
-                if prop.strip():
-                    yield root, prop.strip()
+            root = path
+            while root != os.path.dirname(root):
+                root = os.path.dirname(root)
+                if root not in seen:
+                    seen.add(root)
+                else:
+                    continue
+                if 'svn:externals' in check_output(["svn", "proplist", root]).decode("utf8"):
+                    props = check_output(["svn", "propget", "svn:externals", root]).decode("utf8")
+                    for prop in props.split("\n"):
+                        if prop.strip():
+                            yield root, prop.strip()
 
 def extpath_join(root, uri):
     if uri.startswith("^"):
