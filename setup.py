@@ -9,7 +9,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
 
 setup(
     name='git-svn-clone-externals',
-    version='1.1.5',
+    version='1.1.6',
     description='Clone an svn checkout in a tree of nested git-svn repos and helper tools',
     long_description=long_description,
     url='https://github.com/naufraghi/git-svn-clone-externals',
