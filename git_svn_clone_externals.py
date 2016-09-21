@@ -154,7 +154,7 @@ def extpath_join(root, uri):
     if uri.startswith("^"):
         return root + uri[1:]
     else:
-        raise NotImplementedError
+        raise NotImplementedError("Unsupported uri format: %s" % uri)
 
 def normalize_externals(repo_root, externals):
     # Old syntax: third-party/sounds   http://svn.example.com/repos/sounds [UNSUPPORTED]
